@@ -4,9 +4,6 @@ import io
 import os
 from PIL import Image
 
-# ──────────────────────────────────────────────
-# Configuration
-# ──────────────────────────────────────────────
 API_URL = os.environ.get("API_URL", "http://localhost:8000/api/v1/analyze")
 
 st.set_page_config(
@@ -16,9 +13,6 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-# ──────────────────────────────────────────────
-# CSS
-# ──────────────────────────────────────────────
 st.markdown("""
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Sans:wght@300;400;500&display=swap');
@@ -58,10 +52,16 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# ──────────────────────────────────────────────
-# Helpers
-# ──────────────────────────────────────────────
+# ── session_state init ─────────────────────────────────────────────────────────
+if "result" not in st.session_state:
+    st.session_state.result = None
+if "error_msg" not in st.session_state:
+    st.session_state.error_msg = None
+if "analyzing" not in st.session_state:
+    st.session_state.analyzing = False
 
+
+# ── helpers ────────────────────────────────────────────────────────────────────
 LEVEL_LABEL = {
     "none": "No intervention", "low": "Low effort",
     "medium": "Moderate", "high": "High", "specialist": "Specialist only",
@@ -118,39 +118,29 @@ def render_analysis_grid(report: dict) -> None:
     ]
     html = '<div class="analysis-grid">'
     for lbl, val in cells:
-        html += f'<div class="analysis-cell"><div class="cell-label">{lbl}</div><div class="cell-value">{val}</div></div>'
+        html += (
+            f'<div class="analysis-cell">'
+            f'<div class="cell-label">{lbl}</div>'
+            f'<div class="cell-value">{val}</div>'
+            f'</div>'
+        )
     html += "</div>"
     st.markdown(html, unsafe_allow_html=True)
 
-    concerns = skin.get("visible_concerns", [])
-    if concerns:
-        st.markdown('<div class="section-label" style="margin-top:1.5rem;">Visible Concerns</div>', unsafe_allow_html=True)
-        for c in concerns:
-            st.markdown(f'<div class="concern-item">· {c}</div>', unsafe_allow_html=True)
+    for c in skin.get("visible_concerns", []):
+        st.markdown(f'<div class="concern-item">· {c}</div>', unsafe_allow_html=True)
 
     prominent = face.get("prominent_features", [])
     if prominent:
-        st.markdown('<div class="section-label" style="margin-top:1.5rem;">Prominent Features</div>', unsafe_allow_html=True)
         tags = "".join(f'<span class="prominent-tag">{f}</span>' for f in prominent)
         st.markdown(tags, unsafe_allow_html=True)
 
 
-def call_api(image_bytes: bytes, filename: str):
-    resp = requests.post(
-        API_URL,
-        files={"file": (filename, image_bytes, "image/jpeg")},
-        timeout=120,
-    )
-    return resp.json(), resp.status_code
-
-
 def show_report(result: dict) -> None:
-    """Render the full report. Called only when analysis succeeded."""
     report  = result.get("report", {})
     quality = result.get("quality_check", {})
 
-    score = quality.get("score", 1.0)
-    pct   = int(score * 100)
+    pct = int(quality.get("score", 1.0) * 100)
     st.markdown(
         f'<div style="margin:0.5rem 0 2rem 0;">'
         f'<span class="cell-label">Image Quality — {pct}%</span>'
@@ -159,24 +149,22 @@ def show_report(result: dict) -> None:
         unsafe_allow_html=True,
     )
 
-    st.markdown('<div class="section-label">Overview</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="section-label">Overview</div>', unsafe_allow_html=True)
     st.markdown(f'<div class="summary-card">{report.get("summary","")}</div>', unsafe_allow_html=True)
-
-    st.markdown('<div class="section-label">Facial Analysis</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="section-label">Facial Analysis</div>', unsafe_allow_html=True)
     render_analysis_grid(report)
-
     st.markdown('<hr class="thin-rule">', unsafe_allow_html=True)
 
     tabs = st.tabs([
         "Skincare", "Grooming", "Hairstyle", "Beard",
         "Makeup", "Non-Invasive", "Injectables", "Procedural", "Avoid",
     ])
-    with tabs[0]: render_section("Skincare Protocol",      report.get("skincare_recommendations", []))
-    with tabs[1]: render_section("Grooming Direction",     report.get("grooming_recommendations", []))
-    with tabs[2]: render_section("Hairstyle Guidance",     report.get("hairstyle_recommendations", []))
-    with tabs[3]: render_section("Beard Guidance",         report.get("beard_recommendations", []))
-    with tabs[4]: render_section("Makeup Techniques",      report.get("makeup_recommendations", []))
-    with tabs[5]: render_section("Non-Invasive Options",   report.get("non_invasive_options", []))
+    with tabs[0]: render_section("Skincare Protocol",    report.get("skincare_recommendations", []))
+    with tabs[1]: render_section("Grooming Direction",   report.get("grooming_recommendations", []))
+    with tabs[2]: render_section("Hairstyle Guidance",   report.get("hairstyle_recommendations", []))
+    with tabs[3]: render_section("Beard Guidance",       report.get("beard_recommendations", []))
+    with tabs[4]: render_section("Makeup Techniques",    report.get("makeup_recommendations", []))
+    with tabs[5]: render_section("Non-Invasive Options", report.get("non_invasive_options", []))
     with tabs[6]: render_section(
         "Injectables to Discuss", report.get("injectables_to_discuss", []),
         preamble="Discuss with a qualified injector or aesthetic physician only.",
@@ -187,22 +175,54 @@ def show_report(result: dict) -> None:
     )
     with tabs[8]:
         st.markdown('<div class="section-label">What Not To Do</div>', unsafe_allow_html=True)
-        avoid = report.get("what_not_to_do", [])
-        if not avoid:
-            st.markdown('<div class="rec-desc" style="color:#3a3530;">No specific warnings.</div>', unsafe_allow_html=True)
-        for item in avoid:
+        for item in report.get("what_not_to_do", []):
             st.markdown(f'<div class="warning-card">✕ {item}</div>', unsafe_allow_html=True)
 
     st.markdown(f'<div class="disclaimer">{report.get("disclaimer","")}</div>', unsafe_allow_html=True)
-
     with st.expander("Raw JSON Output"):
         st.json(result.get("raw_json", {}))
 
 
-# ──────────────────────────────────────────────
-# Page layout
-# ──────────────────────────────────────────────
+def do_analysis(image_bytes: bytes, filename: str) -> None:
+    """Called on button click. Stores result in session_state."""
+    try:
+        resp = requests.post(
+            API_URL,
+            files={"file": (filename, image_bytes, "image/jpeg")},
+            timeout=120,
+        )
+        result = resp.json()
+        status = resp.status_code
+    except requests.exceptions.ConnectionError:
+        st.session_state.error_msg = (
+            "Cannot connect to the backend. "
+            "Make sure the FastAPI server is running and API_URL is set correctly."
+        )
+        st.session_state.result = None
+        return
+    except requests.exceptions.Timeout:
+        st.session_state.error_msg = "Request timed out. Please try again."
+        st.session_state.result = None
+        return
+    except Exception as e:
+        st.session_state.error_msg = f"Unexpected error: {e}"
+        st.session_state.result = None
+        return
 
+    if status != 200:
+        err = result.get("error", result)
+        if isinstance(err, dict) and "issues" in err:
+            st.session_state.error_msg = "quality_fail:" + "|".join(err.get("issues", []))
+        else:
+            st.session_state.error_msg = f"Error {status}: {err}"
+        st.session_state.result = None
+        return
+
+    st.session_state.result = result
+    st.session_state.error_msg = None
+
+
+# ── page ───────────────────────────────────────────────────────────────────────
 st.markdown('<div class="hero-title">FaceInsight</div>', unsafe_allow_html=True)
 st.markdown('<div class="hero-sub">AI Cosmetic Analysis · Confidential · Instant</div>', unsafe_allow_html=True)
 st.markdown('<hr class="thin-rule">', unsafe_allow_html=True)
@@ -212,11 +232,14 @@ col_left, col_right = st.columns([1.6, 1])
 with col_left:
     st.markdown('<div class="section-label">Upload your photo</div>', unsafe_allow_html=True)
     st.markdown(
-        '<div class="rec-desc" style="margin-bottom:1rem;">Clear, well-lit frontal portrait. Single face. No sunglasses or heavy filters.</div>',
+        '<div class="rec-desc" style="margin-bottom:1rem;">'
+        'Clear, well-lit frontal portrait. Single face. No sunglasses or heavy filters.'
+        '</div>',
         unsafe_allow_html=True,
     )
     uploaded = st.file_uploader(
-        "Choose image", type=["jpg", "jpeg", "png", "webp"],
+        "Choose image",
+        type=["jpg", "jpeg", "png", "webp"],
         label_visibility="collapsed",
     )
 
@@ -233,12 +256,9 @@ with col_right:
     ]:
         st.markdown(f'<div class="rec-desc">· {item}</div>', unsafe_allow_html=True)
 
-# ──────────────────────────────────────────────
-# Upload flow — all inside one safe block
-# ──────────────────────────────────────────────
-
+# ── upload handling ────────────────────────────────────────────────────────────
 if uploaded is not None:
-    # Convert to JPEG bytes
+
     try:
         img = Image.open(uploaded)
         buf = io.BytesIO()
@@ -250,53 +270,40 @@ if uploaded is not None:
 
     st.markdown('<hr class="thin-rule">', unsafe_allow_html=True)
 
-    # Preview + run button — defined and used in same block
-    preview_col, btn_col = st.columns([1, 2])
-
-    with preview_col:
+    c1, c2 = st.columns([1, 2])
+    with c1:
         st.image(img, use_container_width=True)
-
-    with btn_col:
+    with c2:
         st.markdown('<div class="section-label">Ready</div>', unsafe_allow_html=True)
         st.markdown(
-            '<div class="rec-desc" style="margin-bottom:1.5rem;">Processed securely. Analysis takes 15–30 seconds.</div>',
+            '<div class="rec-desc" style="margin-bottom:1.5rem;">'
+            'Processed securely. Analysis takes 15–30 seconds.'
+            '</div>',
             unsafe_allow_html=True,
         )
-        run = st.button("Run Analysis →")
+        if st.button("Run Analysis →"):
+            st.session_state.result = None
+            st.session_state.error_msg = None
+            with st.spinner("Analyzing…"):
+                do_analysis(img_bytes, uploaded.name)
 
-    if run:
-        st.markdown('<hr class="thin-rule">', unsafe_allow_html=True)
+    st.markdown('<hr class="thin-rule">', unsafe_allow_html=True)
 
-        with st.spinner("Analyzing…"):
-            try:
-                result, status_code = call_api(img_bytes, uploaded.name)
-            except requests.exceptions.ConnectionError:
-                st.error(
-                    "Cannot connect to the backend. "
-                    "Make sure the FastAPI server is running on port 8000."
-                )
-                st.stop()
-            except requests.exceptions.Timeout:
-                st.error("Request timed out. The analysis took too long — please try again.")
-                st.stop()
-            except Exception as e:
-                st.error(f"Unexpected error: {e}")
-                st.stop()
+    if st.session_state.error_msg:
+        msg = st.session_state.error_msg
+        if msg.startswith("quality_fail:"):
+            st.error("Image quality check failed.")
+            for issue in msg.replace("quality_fail:", "").split("|"):
+                st.markdown(f'<div class="warning-card">⚠ {issue}</div>', unsafe_allow_html=True)
+        else:
+            st.error(msg)
 
-        if status_code != 200:
-            err = result.get("error", result)
-            if isinstance(err, dict) and "issues" in err:
-                st.error("Image quality check failed.")
-                for issue in err["issues"]:
-                    st.markdown(f'<div class="warning-card">⚠ {issue}</div>', unsafe_allow_html=True)
-            else:
-                st.error(f"Error {status_code}: {err}")
-            st.stop()
-
-        show_report(result)
+    if st.session_state.result is not None:
+        show_report(st.session_state.result)
 
 else:
-    # Empty state
+    st.session_state.result = None
+    st.session_state.error_msg = None
     st.markdown(
         '<div style="margin-top:4rem;text-align:center;">'
         '<div style="font-family:\'Cormorant Garamond\',serif;font-size:4rem;font-weight:300;color:#2a2a2a;">✦</div>'
