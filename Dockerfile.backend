@@ -1,0 +1,51 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# System deps: build tools + OpenCV + InsightFace runtime
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    cmake \
+    gcc \
+    g++ \
+    git \
+    libgl1 \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender-dev \
+    libgomp1 \
+    libprotobuf-dev \
+    protobuf-compiler \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Upgrade pip first
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel
+
+COPY requirements.txt .
+
+# Install heavy packages individually first to get clearer error messages
+RUN pip install --no-cache-dir numpy==1.26.4
+RUN pip install --no-cache-dir opencv-python-headless==4.9.0.80
+RUN pip install --no-cache-dir onnxruntime==1.18.0
+RUN pip install --no-cache-dir insightface==0.7.3
+
+# Install the rest
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+# Pre-download InsightFace model at build time
+RUN python -c "\
+try:\
+    from insightface.app import FaceAnalysis;\
+    app = FaceAnalysis(name='buffalo_l', providers=['CPUExecutionProvider']);\
+    app.prepare(ctx_id=0, det_size=(640,640));\
+    print('InsightFace model ready');\
+except Exception as e:\
+    print(f'InsightFace preload skipped: {e}')" || true
+
+EXPOSE 8000
+
+CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
