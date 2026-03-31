@@ -377,8 +377,8 @@ with col_btn:
         with st.expander("Raw JSON Output"):
             st.json(result.get("raw_json", {}))
 
-else:
-    st.markdown(
+    else:
+        st.markdown(
         '<div style="margin-top:4rem;text-align:center;">'
         '<div style="font-family:\'Cormorant Garamond\',serif;font-size:4rem;font-weight:300;color:#2a2a2a;">✦</div>'
         '<div style="font-size:0.75rem;letter-spacing:0.3em;text-transform:uppercase;color:#2a2520;">'
