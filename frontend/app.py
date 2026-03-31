@@ -263,13 +263,18 @@ if uploaded:
     st.markdown('<hr class="thin-rule">', unsafe_allow_html=True)
 
     col_img, col_btn = st.columns([1, 2])
-    with col_img:
-    # هنا نقوم بالتحقق: إذا كانت الصورة موجودة وليست None
-        if img:
+with col_img:
+    # التأكد من أن المتغير img موجود وله قيمة قبل استدعاء st.image
+    if 'img' in locals() and img is not None:
+        try:
             st.image(img, use_container_width=True)
-        else:
-        # يمكنك عرض صورة افتراضية أو نص تنبيهي بدلاً من تعطل التطبيق
-            st.write("⚠️ لا توجد صورة")
+        except Exception as e:
+            st.error(f"خطأ في عرض الصورة: {e}")
+    else:
+        st.info("لا توجد صورة متوفرة")
+
+with col_btn:
+    st.markdown('<div class="section-label">Ready</div>', unsafe_allow_html=True)
     with col_btn:
         st.markdown('<div class="section-label">Ready</div>', unsafe_allow_html=True)
         st.markdown(
