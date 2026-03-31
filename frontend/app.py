@@ -272,7 +272,7 @@ if uploaded is not None:
 
     c1, c2 = st.columns([1, 2])
     with c1:
-        st.image(img, use_container_width=True)
+        st.image(img, width=None)
     with c2:
         st.markdown('<div class="section-label">Ready</div>', unsafe_allow_html=True)
         st.markdown(
