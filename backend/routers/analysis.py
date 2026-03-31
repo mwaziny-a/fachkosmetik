@@ -21,17 +21,17 @@ async def analyze_face(file: UploadFile = File(...)):
 
 
 @router.post(
-    "/analyze",
-    response_model=AnalysisResponse,
-    summary="Analyze facial features and generate cosmetic recommendations",
-    responses={
-        400: {"model": ErrorResponse, "description": "Invalid input"},
-        422: {"model": ErrorResponse, "description": "Image quality issue"},
-        500: {"model": ErrorResponse, "description": "Processing error"},
-    },
+    "/analyze", 
+    response_model=AnalysisResponse, 
+    summary="Analyze facial features and generate cosmetic recommendations"
 )
 async def analyze_face(file: UploadFile = File(...)):
+    # الكود الذي عدلناه سابقاً (الـ Lazy Loading)
     await validate_image_file(file)
     image_bytes = await file.read()
+    
+    from services.analysis_service import AnalysisService
+    analysis_service = AnalysisService()
+    
     result = await analysis_service.run_full_analysis(image_bytes, file.filename)
     return result
