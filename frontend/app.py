@@ -4,6 +4,17 @@ import io
 import os
 from PIL import Image
 
+API_URL = st.secrets["API_URL"]
+
+# مثال لطلب بيانات من الباكيند
+try:
+    response = requests.get(f"{API_URL}/items") # استبدل /items بالـ endpoint الخاص بك
+    if response.status_code == 200:
+        data = response.json()
+        # عرض البيانات...
+except:
+    st.error("لا يمكن الاتصال بالخلفية على Render")
+
 API_URL = os.environ.get("API_URL", "http://localhost:8000/api/v1/analyze")
 
 st.set_page_config(
