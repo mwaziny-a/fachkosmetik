@@ -264,7 +264,12 @@ if uploaded:
 
     col_img, col_btn = st.columns([1, 2])
     with col_img:
-        st.image(img, use_container_width=True)
+    # هنا نقوم بالتحقق: إذا كانت الصورة موجودة وليست None
+        if img:
+            st.image(img, use_container_width=True)
+        else:
+        # يمكنك عرض صورة افتراضية أو نص تنبيهي بدلاً من تعطل التطبيق
+            st.write("⚠️ لا توجد صورة")
     with col_btn:
         st.markdown('<div class="section-label">Ready</div>', unsafe_allow_html=True)
         st.markdown(
