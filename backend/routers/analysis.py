@@ -26,7 +26,7 @@ async def analyze_face(file: UploadFile = File(...)):
     image_bytes = await file.read()
     
     # تحميل الخدمة هنا (Lazy Loading) لتجنب مشكلة الذاكرة في Render
-    from backend.services.analysis_service import AnalysisService
+    from services.analysis_service import AnalysisService
     analysis_service = AnalysisService()
     
     result = await analysis_service.run_full_analysis(image_bytes, file.filename)
