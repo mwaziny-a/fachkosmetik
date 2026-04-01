@@ -1,3 +1,6 @@
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -6,6 +9,7 @@ import logging
 
 from backend.routers import analysis
 from utils.error_handlers import register_exception_handlers
+
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

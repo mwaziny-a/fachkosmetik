@@ -48,4 +48,8 @@ except Exception as e:\
 
 EXPOSE 8000
 
-CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
+# إضافة المجلد الحالي للمسار لضمان رؤية المجلدات
+ENV PYTHONPATH="/app"
+
+# تشغيل السيرفر مع تحديد المجلد الصحيح
+CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "7860"]

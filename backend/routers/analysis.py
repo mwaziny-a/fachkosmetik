@@ -1,8 +1,9 @@
+# Fix for Docker
 from fastapi import APIRouter, UploadFile, File, HTTPException
 import logging
 
 # تأكد أن المسارات تبدأ بـ backend إذا كان الملف بالخارج
-from backend.models.schemas import AnalysisResponse, ErrorResponse
+from models.schemas import AnalysisResponse, ErrorResponse
 from utils.validators import validate_image_file
 
 router = APIRouter()
