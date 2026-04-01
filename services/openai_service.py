@@ -27,6 +27,7 @@ class OpenAIService:
             "model": self.MODEL,
             "max_tokens": 4096,
             "temperature": 0.4,
+            "response_format": {"type": "json_object"},
             "messages": [
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {
@@ -56,14 +57,26 @@ class OpenAIService:
         return self._parse_json_response(raw)
 
     def _parse_json_response(self, raw: str) -> dict:
-        cleaned = raw.strip()
+        cleaned = (raw or "").strip()
+        if not cleaned:
+            raise RuntimeError("Failed to parse AI response as JSON: empty response content")
+
         if cleaned.startswith("```"):
             lines = cleaned.split("\n")
             cleaned = "\n".join(lines[1:])
             if cleaned.endswith("```"):
                 cleaned = cleaned[: cleaned.rfind("```")]
             cleaned = cleaned.strip()
+
         try:
             return json.loads(cleaned)
         except json.JSONDecodeError as e:
-            raise RuntimeError(f"Failed to parse AI response as JSON: {e}")
+            start = cleaned.find("{")
+            end = cleaned.rfind("}")
+            if start != -1 and end != -1 and end > start:
+                try:
+                    return json.loads(cleaned[start : end + 1])
+                except json.JSONDecodeError:
+                    pass
+            preview = cleaned[:200].replace("\n", " ")
+            raise RuntimeError(f"Failed to parse AI response as JSON: {e}. Raw preview: {preview}")
