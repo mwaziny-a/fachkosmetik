@@ -4,7 +4,10 @@ import io
 import os
 from PIL import Image
 
-API_URL = st.secrets["API_URL"]
+try:
+    API_URL = st.secrets["API_URL"]
+except Exception:
+    API_URL = os.environ.get("API_URL", "http://localhost:8000/api/v1/analyze")
 
 # مثال لطلب بيانات من الباكيند
 try:
@@ -14,8 +17,6 @@ try:
         # عرض البيانات...
 except:
     st.error("لا يمكن الاتصال بالخلفية على Render")
-
-API_URL = os.environ.get("API_URL", "http://localhost:8000/api/v1/analyze")
 
 st.set_page_config(
     page_title="FaceInsight AI",
