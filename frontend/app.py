@@ -4,19 +4,31 @@ import io
 import os
 from PIL import Image
 
-try:
-    API_URL = st.secrets["API_URL"]
-except Exception:
-    API_URL = os.environ.get("API_URL", "http://localhost:8000/api/v1/analyze")
+DEFAULT_ANALYZE_URLS = [
+    "http://127.0.0.1:8000/api/v1/analyze",
+    "http://localhost:8000/api/v1/analyze",
+]
 
-# مثال لطلب بيانات من الباكيند
-try:
-    response = requests.get(f"{API_URL}/items") # استبدل /items بالـ endpoint الخاص بك
-    if response.status_code == 200:
-        data = response.json()
-        # عرض البيانات...
-except:
-    st.error("لا يمكن الاتصال بالخلفية على Render")
+
+def build_api_candidates() -> list:
+    candidates = []
+    try:
+        configured_url = st.secrets["API_URL"]
+    except Exception:
+        configured_url = os.environ.get("API_URL", "")
+
+    if configured_url:
+        candidates.append(configured_url.rstrip("/"))
+
+    for url in DEFAULT_ANALYZE_URLS:
+        if url not in candidates:
+            candidates.append(url)
+
+    return candidates
+
+
+API_CANDIDATES = build_api_candidates()
+API_URL = API_CANDIDATES[0]
 
 st.set_page_config(
     page_title="FaceInsight AI",
@@ -197,27 +209,36 @@ def show_report(result: dict) -> None:
 
 def do_analysis(image_bytes: bytes, filename: str) -> None:
     """Called on button click. Stores result in session_state."""
-    try:
-        resp = requests.post(
-            API_URL,
-            files={"file": (filename, image_bytes, "image/jpeg")},
-            timeout=120,
-        )
-        result = resp.json()
-        status = resp.status_code
-    except requests.exceptions.ConnectionError:
+    resp = None
+    result = {}
+    status = 0
+
+    for url in API_CANDIDATES:
+        try:
+            resp = requests.post(
+                url,
+                files={"file": (filename, image_bytes, "image/jpeg")},
+                timeout=120,
+            )
+            result = resp.json()
+            status = resp.status_code
+            break
+        except requests.exceptions.ConnectionError:
+            continue
+        except requests.exceptions.Timeout:
+            st.session_state.error_msg = "Request timed out. Please try again."
+            st.session_state.result = None
+            return
+        except Exception as e:
+            st.session_state.error_msg = f"Unexpected error: {e}"
+            st.session_state.result = None
+            return
+
+    if resp is None:
         st.session_state.error_msg = (
             "Cannot connect to the backend. "
-            "Make sure the FastAPI server is running and API_URL is set correctly."
+            "Make sure FastAPI is running on port 8000, or set API_URL in Streamlit secrets."
         )
-        st.session_state.result = None
-        return
-    except requests.exceptions.Timeout:
-        st.session_state.error_msg = "Request timed out. Please try again."
-        st.session_state.result = None
-        return
-    except Exception as e:
-        st.session_state.error_msg = f"Unexpected error: {e}"
         st.session_state.result = None
         return
 
