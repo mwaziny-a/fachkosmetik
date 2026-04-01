@@ -2,6 +2,7 @@ import streamlit as st
 import requests
 import io
 import os
+import asyncio
 from PIL import Image
 
 DEFAULT_ANALYZE_URLS = [
@@ -207,6 +208,28 @@ def show_report(result: dict) -> None:
         st.json(result.get("raw_json", {}))
 
 
+def run_local_analysis(image_bytes: bytes, filename: str) -> dict:
+    from fastapi import HTTPException
+    from services.analysis_service import AnalysisService
+
+    async def _run() -> dict:
+        analysis_service = AnalysisService()
+        response = await analysis_service.run_full_analysis(image_bytes, filename)
+        return response.model_dump()
+
+    try:
+        return asyncio.run(_run())
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        try:
+            return loop.run_until_complete(_run())
+        finally:
+            loop.close()
+    except HTTPException as exc:
+        detail = exc.detail if isinstance(exc.detail, dict) else {"message": str(exc.detail)}
+        return {"success": False, "error": detail, "status_code": exc.status_code}
+
+
 def do_analysis(image_bytes: bytes, filename: str) -> None:
     """Called on button click. Stores result in session_state."""
     resp = None
@@ -235,10 +258,20 @@ def do_analysis(image_bytes: bytes, filename: str) -> None:
             return
 
     if resp is None:
-        st.session_state.error_msg = (
-            "Cannot connect to the backend. "
-            "Make sure FastAPI is running on port 8000, or set API_URL in Streamlit secrets."
-        )
+        local_result = run_local_analysis(image_bytes, filename)
+        if local_result.get("success"):
+            st.session_state.result = local_result
+            st.session_state.error_msg = None
+            return
+
+        err = local_result.get("error", local_result)
+        if isinstance(err, dict) and "issues" in err:
+            st.session_state.error_msg = "quality_fail:" + "|".join(err.get("issues", []))
+        else:
+            st.session_state.error_msg = (
+                "Backend HTTP connection failed, and local analysis also failed: "
+                f"{err}"
+            )
         st.session_state.result = None
         return
 
