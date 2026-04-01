@@ -11,6 +11,19 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+
+def load_streamlit_secrets_into_env() -> None:
+    for key in ["OPENAI_API_KEY", "API_URL"]:
+        try:
+            value = st.secrets[key]
+        except Exception:
+            value = None
+        if value and not os.environ.get(key):
+            os.environ[key] = value
+
+
+load_streamlit_secrets_into_env()
+
 DEFAULT_ANALYZE_URLS = [
     "http://127.0.0.1:8000/api/v1/analyze",
     "http://localhost:8000/api/v1/analyze",
@@ -234,6 +247,10 @@ def run_local_analysis(image_bytes: bytes, filename: str) -> dict:
     except HTTPException as exc:
         detail = exc.detail if isinstance(exc.detail, dict) else {"message": str(exc.detail)}
         return {"success": False, "error": detail, "status_code": exc.status_code}
+    except ValueError as exc:
+        return {"success": False, "error": {"message": str(exc)}, "status_code": 500}
+    except Exception as exc:
+        return {"success": False, "error": {"message": str(exc)}, "status_code": 500}
 
 
 def do_analysis(image_bytes: bytes, filename: str) -> None:
@@ -274,9 +291,10 @@ def do_analysis(image_bytes: bytes, filename: str) -> None:
         if isinstance(err, dict) and "issues" in err:
             st.session_state.error_msg = "quality_fail:" + "|".join(err.get("issues", []))
         else:
+            message = err.get("message", err) if isinstance(err, dict) else err
             st.session_state.error_msg = (
-                "Backend HTTP connection failed, and local analysis also failed: "
-                f"{err}"
+                "Backend HTTP connection failed. "
+                f"Local analysis failed: {message}"
             )
         st.session_state.result = None
         return
